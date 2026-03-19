@@ -1,0 +1,25 @@
+# Environment
+.env
+*.env
+
+# Logs & Data
+logs/
+workspace/
+backups/
+data/
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+
+# Temp
+*.tmp
+tmp/
