@@ -2,13 +2,14 @@
 # Makefile - 外部贸易团队
 # ===========================================
 
-.PHONY: help setup start stop ps logs health backup test test-minimax test-hr test-e2e clean
+.PHONY: help setup config start stop ps logs health backup test test-minimax test-hr test-e2e clean
 
 # 默认目标
 help:
 	@echo "外部贸易团队 - 可用命令"
 	@echo ""
-	@echo "setup        - 初始化环境"
+	@echo "setup        - 初始化环境 (首次运行)"
+	@echo "config       - 配置API密钥"
 	@echo "start        - 启动所有服务"
 	@echo "stop         - 停止所有服务"
 	@echo "ps           - 查看服务状态"
@@ -21,10 +22,15 @@ help:
 	@echo "test-e2e     - 端到端测试"
 	@echo "clean        - 清理容器和数据"
 
-# 初始化
+# 首次初始化
 setup:
 	@echo "运行初始化脚本..."
 	./scripts/setup_minimax.sh
+
+# 配置API
+config:
+	@echo "配置API密钥..."
+	node scripts/setup.js
 
 # 启动
 start:
