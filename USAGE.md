@@ -377,3 +377,55 @@ A: 在 src/ 目录添加新模块，更新对应 Agent 的 config.json。
 -  logs/ 目录下的日志文件
 -  docker-compose ps 检查服务状态
 -  make health 进行健康检查
+
+---
+
+## 🔌 外部系统集成
+
+### CRM 集成
+
+```javascript
+const { syncCustomerToCRM, CRM_TYPE } = require('./src/integrations/crm');
+
+// 同步客户
+await syncCustomerToCRM(
+  { name: 'ABC Corp', email: 'abc@example.com', company: 'ABC' },
+  { type: 'hubspot', apiKey: 'xxx' }
+);
+```
+
+### 支付集成
+
+```javascript
+const { processPayment, PROVIDER } = require('./src/integrations/payment');
+
+// 处理支付
+const payment = await processPayment(
+  PROVIDER.STRIPE,
+  { apiKey: 'sk_xxx' },
+  { total_amount: 1000, currency: 'USD', order_id: 'ORD-001' }
+);
+```
+
+### 物流集成
+
+```javascript
+const { createShipment, trackShipment, selectBestCarrier, CARRIER } = require('./src/integrations/logistics');
+
+// 创建发货
+const shipment = await createShipment(
+  CARRIER.FEDEX,
+  { apiKey: 'xxx', accountNumber: 'xxx' },
+  { customer: { name: 'ABC' }, shipping_country: 'US' }
+);
+
+// 跟踪
+const tracking = await trackShipment(CARRIER.FEDEX, config, '7489xxx');
+
+// 智能选择最优物流
+const best = await selectBestCarrier(
+  { fedex: {...}, dhl: {...} },
+  'CN', 'US', 5 // 5kg
+);
+```
+
