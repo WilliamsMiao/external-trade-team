@@ -6,6 +6,10 @@
 
 const fs = require('fs-extra');
 const path = require('path');
+const axios = require('axios');
+const cheerio = require('cheerio');
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * 获客管理器
@@ -16,6 +20,239 @@ class CustomerAcquisition {
     this.customers = [];
     this.inquiries = [];
     this.loadData();
+  }
+
+  /**
+   * 互联网获客：基于公开搜索结果发现潜在客户
+   */
+  async discoverLeadsOnline(query, options = {}) {
+    const maxResults = Math.max(1, Math.min(Number(options.maxResults || 10), 30));
+    const timeout = Number(options.timeout || process.env.COLLECT_TIMEOUT_MS || 12000);
+    const retries = Number(options.retries || process.env.COLLECT_RETRIES || 2);
+    const enrichTopN = Math.max(0, Math.min(Number(options.enrichTopN ?? 3), maxResults));
+    const url = 'https://html.duckduckgo.com/html/';
+
+    let lastError = null;
+    for (let i = 0; i <= retries; i++) {
+      try {
+        const response = await axios.get(url, {
+          params: { q: query },
+          timeout,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (external-trade-team lead discovery)',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+        });
+
+        const $ = cheerio.load(response.data || '');
+        const rows = [];
+
+        $('.result').each((_, el) => {
+          if (rows.length >= maxResults) return;
+          const title = $(el).find('.result__a').first().text().trim();
+          const href = $(el).find('.result__a').first().attr('href') || '';
+          const normalizedUrl = this.normalizeResultUrl(href);
+          const snippet = $(el).find('.result__snippet').first().text().trim();
+
+          if (!title || !normalizedUrl) return;
+
+          const domainMatch = normalizedUrl.match(/https?:\/\/([^/?#]+)/i);
+          const domain = domainMatch ? domainMatch[1].toLowerCase() : 'unknown';
+
+          const score = this.scoreLead({ title, snippet, domain, query });
+          rows.push({
+            id: `LEAD_${Date.now()}_${rows.length + 1}`,
+            company: this.extractCompanyName(title, domain),
+            title,
+            url: normalizedUrl,
+            domain,
+            snippet,
+            source: 'duckduckgo',
+            score,
+            qualified: score >= 60,
+            collectedAt: new Date().toISOString(),
+          });
+        });
+
+        const deduped = this.dedupeLeads(rows).sort((a, b) => b.score - a.score).slice(0, maxResults);
+        const leads = await this.enrichLeadContacts(deduped, { topN: enrichTopN, timeout, retries: 1 });
+        const required = ['company', 'url', 'domain', 'snippet', 'score'];
+        const structuredCount = leads.filter((l) =>
+          required.every((f) => l[f] !== undefined && l[f] !== null && String(l[f]).length > 0)
+        ).length;
+        const contactCount = leads.filter((l) => (l.emails && l.emails.length > 0) || (l.phones && l.phones.length > 0)).length;
+
+        return {
+          success: true,
+          mode: 'real_web',
+          query,
+          total: leads.length,
+          qualified: leads.filter((l) => l.qualified).length,
+          structuredRate: leads.length > 0 ? Number((structuredCount / leads.length).toFixed(3)) : 0,
+          contactCoverage: leads.length > 0 ? Number((contactCount / leads.length).toFixed(3)) : 0,
+          leads,
+        };
+      } catch (error) {
+        lastError = error;
+        if (i < retries) {
+          await sleep(400 * (i + 1));
+        }
+      }
+    }
+
+    return {
+      success: false,
+      mode: 'failed',
+      query,
+      total: 0,
+      qualified: 0,
+      error: lastError ? lastError.message : 'lead discovery failed',
+      leads: [],
+    };
+  }
+
+  dedupeLeads(leads = []) {
+    const byDomain = new Map();
+    for (const lead of leads) {
+      const key = lead.domain || lead.url || lead.id;
+      if (!key) continue;
+      const prev = byDomain.get(key);
+      if (!prev || Number(lead.score || 0) > Number(prev.score || 0)) {
+        byDomain.set(key, lead);
+      }
+    }
+    return Array.from(byDomain.values());
+  }
+
+  async enrichLeadContacts(leads = [], options = {}) {
+    const topN = Math.max(0, Math.min(Number(options.topN || 0), leads.length));
+    if (topN === 0) return leads;
+
+    const enriched = [...leads];
+    for (let i = 0; i < topN; i++) {
+      const lead = enriched[i];
+      const contacts = await this.fetchLeadContacts(lead.url, options);
+      const hasContacts = contacts.emails.length > 0 || contacts.phones.length > 0;
+      const scoreBoost = hasContacts ? 8 : 0;
+      const nextScore = Math.max(0, Math.min(100, Number(lead.score || 0) + scoreBoost));
+      enriched[i] = {
+        ...lead,
+        emails: contacts.emails,
+        phones: contacts.phones,
+        contactScore: hasContacts ? 1 : 0,
+        score: nextScore,
+        qualified: nextScore >= 60,
+      };
+    }
+    return enriched.sort((a, b) => b.score - a.score);
+  }
+
+  async fetchLeadContacts(url, options = {}) {
+    if (!url) return { emails: [], phones: [] };
+
+    const timeout = Number(options.timeout || process.env.COLLECT_TIMEOUT_MS || 12000);
+    const retries = Math.max(0, Number(options.retries || 0));
+    let lastError = null;
+
+    for (let i = 0; i <= retries; i++) {
+      try {
+        const response = await axios.get(url, {
+          timeout,
+          maxRedirects: 3,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (external-trade-team contact enrichment)',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+        });
+
+        const html = String(response.data || '');
+        return {
+          emails: this.extractEmails(html).slice(0, 3),
+          phones: this.extractPhones(html).slice(0, 3),
+        };
+      } catch (error) {
+        lastError = error;
+        if (i < retries) {
+          await sleep(250 * (i + 1));
+        }
+      }
+    }
+
+    if (process.env.DEBUG_LEAD_ENRICH === '1' && lastError) {
+      console.warn(`[Acquisition] contact enrichment failed for ${url}: ${lastError.message}`);
+    }
+    return { emails: [], phones: [] };
+  }
+
+  extractEmails(html = '') {
+    const found = html.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+    return Array.from(new Set(found.map((v) => String(v).toLowerCase())));
+  }
+
+  extractPhones(html = '') {
+    const compact = String(html).replace(/<[^>]+>/g, ' ');
+    const found = compact.match(/\+?\d[\d\s().-]{6,}\d/g) || [];
+    return Array.from(
+      new Set(
+        found
+          .map((v) => v.trim())
+          .filter((v) => {
+            const digits = v.replace(/\D/g, '');
+            if (digits.length < 8 || digits.length > 16) return false;
+            if (/^(\d)\1+$/.test(digits)) return false;
+            if (/^0+$/.test(digits)) return false;
+            if (/0{5,}/.test(digits)) return false;
+            return true;
+          })
+      )
+    );
+  }
+
+  normalizeResultUrl(url) {
+    if (!url) return null;
+    let next = url;
+
+    if (next.startsWith('//')) {
+      next = `https:${next}`;
+    }
+
+    try {
+      const parsed = new URL(next);
+      const redirectTarget = parsed.searchParams.get('uddg');
+      if (redirectTarget) {
+        return decodeURIComponent(redirectTarget);
+      }
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  scoreLead({ title, snippet, domain, query }) {
+    const text = `${title} ${snippet} ${domain}`.toLowerCase();
+    let score = 20;
+
+    const positive = ['import', 'distributor', 'wholesale', 'supplier', 'trading', 'buyer', 'procurement', 'b2b'];
+    const negative = ['wikipedia', 'youtube', 'facebook', 'instagram', 'reddit', 'news'];
+
+    for (const k of positive) {
+      if (text.includes(k)) score += 12;
+    }
+    for (const k of negative) {
+      if (text.includes(k)) score -= 10;
+    }
+
+    if (query && text.includes(String(query).split(' ')[0]?.toLowerCase())) score += 8;
+    return Math.max(0, Math.min(100, score));
+  }
+
+  extractCompanyName(title, domain) {
+    const cleaned = title
+      .replace(/\s*[-|–].*$/, '')
+      .replace(/\b(official|homepage|home)\b/gi, '')
+      .trim();
+    if (cleaned) return cleaned;
+    return domain.split('.').slice(0, -1).join('.') || domain;
   }
 
   /**

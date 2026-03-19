@@ -40,6 +40,62 @@ const KEYWORD_MAP = {
   ]
 };
 
+const PRIORITY_WEIGHT = {
+  high: 1,
+  medium: 0.7,
+  low: 0.45,
+};
+
+function extractBusinessSignals(taskDescription = '') {
+  const text = String(taskDescription || '');
+  const normalized = text.toLowerCase();
+
+  const amountMatch = text.match(/\$\s*(\d+(?:,\d{3})*(?:\.\d+)?)/) || text.match(/预算\s*(\d+(?:,\d{3})*(?:\.\d+)?)/);
+  const quantityMatch = text.match(/(\d+)\s*(?:件|个|台|套|pcs|pieces?|units?)/i);
+  const daysMatch = text.match(/(\d+)\s*(?:天|days?)/i);
+
+  const budget = amountMatch ? Number(String(amountMatch[1]).replace(/,/g, '')) : 0;
+  const quantity = quantityMatch ? Number(quantityMatch[1]) : 0;
+  const dueDays = daysMatch ? Number(daysMatch[1]) : null;
+  const urgency = dueDays !== null ? (dueDays <= 15 ? 'high' : dueDays <= 30 ? 'medium' : 'low') : 'medium';
+
+  return {
+    text: normalized,
+    budget,
+    quantity,
+    dueDays,
+    urgency,
+    hasBuyerIntent: /(询价|inquiry|quote|purchase|order|客户|buyer)/i.test(text),
+    hasFulfillmentRisk: /(库存|inventory|shipping|物流|交付|delivery|production|生产)/i.test(text),
+  };
+}
+
+function estimateBusinessValue(signals = {}, recommendedLead = 'coordinator') {
+  const base = signals.budget > 0
+    ? signals.budget
+    : (signals.quantity > 0 ? signals.quantity * 28 : 4500);
+
+  const conversionByLead = {
+    sales_lead: 0.55,
+    supply_lead: 0.4,
+    ops_lead: 0.35,
+    finance_lead: 0.3,
+    hr_trainer: 0.15,
+    coordinator: 0.25,
+  };
+
+  const urgencyWeight = PRIORITY_WEIGHT[signals.urgency || 'medium'] || 0.7;
+  const conversion = conversionByLead[recommendedLead] || 0.25;
+  const expectedValue = Number((base * conversion * urgencyWeight).toFixed(2));
+
+  return {
+    potentialDealValue: Number(base.toFixed(2)),
+    expectedDealValue: expectedValue,
+    urgency: signals.urgency || 'medium',
+    dueDays: signals.dueDays,
+  };
+}
+
 /**
  * 路由任务到Lead
  * 
@@ -48,7 +104,8 @@ const KEYWORD_MAP = {
  * @returns {Object} 路由结果
  */
 function routeTaskToLead(taskDescription, options = {}) {
-  const text = taskDescription.toLowerCase();
+  const signals = extractBusinessSignals(taskDescription);
+  const text = signals.text;
   
   // 1. 关键词匹配
   let scores = {};
@@ -72,13 +129,17 @@ function routeTaskToLead(taskDescription, options = {}) {
   
   if (sorted.length > 0) {
     recommended = sorted[0][0];
-    confidence = Math.min(sorted[0][1] / 3, 1); // 归一化到0-1
+    const keywordConfidence = Math.min(sorted[0][1] / 3, 1);
+    const businessBoost = signals.hasBuyerIntent ? 0.12 : 0;
+    confidence = Math.min(keywordConfidence + businessBoost, 1); // 归一化到0-1
   } else {
     // 默认路由到Coordinator自己处理
     recommended = 'coordinator';
     confidence = 0;
   }
   
+  const business = estimateBusinessValue(signals, recommended);
+
   const result = {
     task: taskDescription,
     recommended_lead: recommended,
@@ -87,7 +148,8 @@ function routeTaskToLead(taskDescription, options = {}) {
       lead,
       score
     })),
-    reason: generateRoutingReason(recommended, taskDescription),
+    reason: generateRoutingReason(recommended, taskDescription, business),
+    business,
     routed_at: new Date().toISOString()
   };
   
@@ -99,17 +161,19 @@ function routeTaskToLead(taskDescription, options = {}) {
 /**
  * 生成路由原因
  */
-function generateRoutingReason(lead, taskDescription) {
+function generateRoutingReason(lead, taskDescription, business = {}) {
   const reasons = {
-    [LEAD_TYPES.SALES]: '检测到销售相关关键词（客户、询盘、报价等）',
-    [LEAD_TYPES.SUPPLY]: '检测到采购/供应链相关关键词（供应商、库存、生产等）',
-    [LEAD_TYPES.OPS]: '检测到运营相关关键词（物流、质检、运输等）',
-    [LEAD_TYPES.FINANCE]: '检测到财务相关关键词（发票、付款、收款等）',
+    [LEAD_TYPES.SALES]: '检测到销售意图（客户、询盘、报价）且对成交价值影响最大',
+    [LEAD_TYPES.SUPPLY]: '检测到供应链风险（供应商、库存、生产）需优先保障交付',
+    [LEAD_TYPES.OPS]: '检测到履约执行关键词（物流、排程、运输）需运营介入',
+    [LEAD_TYPES.FINANCE]: '检测到资金与回款关键词（发票、付款、收款）需财务跟进',
     [LEAD_TYPES.HR]: '检测到人事相关关键词（招聘、Agent配置等）',
     'coordinator': '未识别到具体Lead关键词，需要人工判断'
   };
-  
-  return reasons[lead] || '基于关键词匹配';
+
+  const base = reasons[lead] || '基于关键词匹配';
+  if (!business || !business.potentialDealValue) return base;
+  return `${base}；预计机会金额 $${business.potentialDealValue}，期望价值 $${business.expectedDealValue}。`;
 }
 
 /**
@@ -119,7 +183,12 @@ function generateRoutingReason(lead, taskDescription) {
  * @returns {Promise<Object>} 每日汇总
  */
 async function generateDailySummary(options = {}) {
-  // 模拟从数据库聚合数据
+  const snapshot = options.snapshot || {};
+  const sales = snapshot.sales || {};
+  const supply = snapshot.supply || {};
+  const operations = snapshot.operations || {};
+  const finance = snapshot.finance || {};
+
   const today = new Date().toISOString().split('T')[0];
   
   const summary = {
@@ -128,38 +197,38 @@ async function generateDailySummary(options = {}) {
     
     // 销售
     sales: {
-      new_inquiries: Math.floor(Math.random() * 10) + 3,
-      quotes_sent: Math.floor(Math.random() * 5) + 1,
-      orders_confirmed: Math.floor(Math.random() * 3),
-      pending: Math.floor(Math.random() * 8)
+      new_inquiries: Number(sales.new_inquiries || 0),
+      quotes_sent: Number(sales.quotes_sent || 0),
+      orders_confirmed: Number(sales.orders_confirmed || 0),
+      pending: Number(sales.pending || 0)
     },
     
     // 供应链
     supply: {
-      pending_pos: Math.floor(Math.random() * 5),
-      shipments_in_transit: Math.floor(Math.random() * 8),
-      low_stock_items: Math.floor(Math.random() * 4)
+      pending_pos: Number(supply.pending_pos || 0),
+      shipments_in_transit: Number(supply.shipments_in_transit || 0),
+      low_stock_items: Number(supply.low_stock_items || 0)
     },
     
     // 运营
     operations: {
-      active_productions: Math.floor(Math.random() * 6),
-      qc_passed: Math.floor(Math.random() * 20) + 10,
-      issues_reported: Math.floor(Math.random() * 3)
+      active_productions: Number(operations.active_productions || 0),
+      qc_passed: Number(operations.qc_passed || 0),
+      issues_reported: Number(operations.issues_reported || 0)
     },
     
     // 财务
     finance: {
-      invoices_issued: Math.floor(Math.random() * 5),
-      payments_received: Math.floor(Math.random() * 4),
-      overdue_invoices: Math.floor(Math.random() * 2)
+      invoices_issued: Number(finance.invoices_issued || 0),
+      payments_received: Number(finance.payments_received || 0),
+      overdue_invoices: Number(finance.overdue_invoices || 0)
     },
-    
-    // 需要关注的事项
-    alerts: generateAlerts(),
     
     generated_at: new Date().toISOString()
   };
+
+  // 需要关注的事项
+  summary.alerts = generateAlerts(summary);
   
   console.log(`[Coordinator] Generated daily summary for ${today}`);
   
@@ -169,19 +238,18 @@ async function generateDailySummary(options = {}) {
 /**
  * 生成告警
  */
-function generateAlerts() {
+function generateAlerts(summary = {}) {
   const alerts = [];
-  
-  // 随机生成告警
-  if (Math.random() > 0.7) {
+
+  if ((summary.supply?.low_stock_items || 0) > 0) {
     alerts.push({
       type: 'warning',
       category: 'supply',
       message: '部分产品库存偏低，建议及时补货'
     });
   }
-  
-  if (Math.random() > 0.8) {
+
+  if ((summary.finance?.overdue_invoices || 0) > 0) {
     alerts.push({
       type: 'info',
       category: 'finance',

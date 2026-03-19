@@ -56,3 +56,13 @@ Thumbs.db
 *.tar.gz
 openclaw_tmp/
 workspace_data/
+
+# ===========================================
+# 生成的过程文档
+# ===========================================
+00_DEPLOYMENT_START_HERE.md
+DEPLOYMENT_*.md
+README_DEPLOYMENT.md
+STARTUP_SUCCESS.md
+DOCKER_TROUBLESHOOTING.md
+QUICKSTART.md

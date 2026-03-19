@@ -1,56 +1,46 @@
-# 外部贸易团队多Agent系统
+# 外贸团队多 Agent 系统
 
-基于 OpenClaw + MiniMax 的外贸团队自动化系统。
+这是一个面向外贸业务的多 Agent 自动化系统，提供选品、获客、询盘处理、供应链协同和财务流转的一体化运行环境。
 
-## 项目简介
+## 你可以做什么
+- 通过 `make start` 一键启动整套服务
+- 用 `make status` / `make watch` 查看运行态
+- 用 `make report` / `make briefing` 看团队执行结果
+- 用 `make dashboard` 看管理者驾驶舱
+- 用 `make ask AGENT=sales MSG='...'` 和单个 Agent 交互
 
-6个专业化AI Agent协同处理外贸业务：
-- **Coordinator**: 跨部门任务协调
-- **HR Trainer**: 人事管理、Agent配置
-- **Sales Lead**: 销售询盘、报价、客户管理
-- **Supply Lead**: 供应链、采购、库存
-- **Ops Lead**: 生产排程、质检、物流
-- **Finance Lead**: 发票、收款、成本分析
+## Agent 角色
+- `coordinator`: 任务协调与路由
+- `hr`: 团队配置与训练
+- `sales`: 询盘、报价、客户跟进
+- `acquisition`: 互联网获客与线索提纯
+- `selection`: 互联网选品与质量门禁
+- `supply`: 供应链与库存核查
+- `ops`: 生产排程与交付协调
+- `finance`: 开票、收款与对账
 
 ## 快速开始
-
 ```bash
-# 1. 克隆项目
-git clone https://github.com/WilliamsMiao/external-trade-team.git
-cd external_trade_team
-
-# 2. 初始化
 chmod +x scripts/*.sh
-./scripts/setup_minimax.sh
-
-# 3. 配置
-cp .env.example .env
-# 编辑 .env 填入配置
-
-# 4. 启动
+./scripts/env_wizard.js
 make start
+make health
 ```
 
-## 开发阶段
+## 常用命令
+```bash
+make status
+make watch
+make report
+make briefing
+make dashboard
+make demo
+```
 
-- [x] 阶段0: 项目骨架
-- [x] 阶段1: MiniMax API集成 + Agent Factory
-- [x] 阶段2: HR_Trainer 完整工作流
-- [x] 阶段3: 业务Agent基础实现
-- [x] 阶段4: 外部系统集成 ✅ 当前
+## 安全提醒
+- `.env` 里包含敏感配置，不要提交到 Git
+- 过程文档会自动忽略，避免把运行记录带进版本库
 
-## 技术栈
-
-- **运行时**: OpenClaw
-- **LLM**: MiniMax API
-- **数据库**: PostgreSQL
-- **缓存**: Redis
-- **编排**: Docker Compose
-
-## 文档
-
-详细使用说明见 [USAGE.md](USAGE.md)
-
-## License
-
-MIT
+## 说明
+- 详细使用方式请看 [USAGE.md](USAGE.md)
+- 如需了解各命令，可运行 `make help`
