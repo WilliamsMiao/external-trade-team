@@ -1,0 +1,110 @@
+# ===========================================
+# Telegram 群组配置 - telegram_groups.yml
+# 各职能团队的 Telegram 群组
+# ===========================================
+
+# 群组定义
+groups:
+  # 管理高层群
+  mgmt_hq:
+    name: "管理高层"
+    chat_id: "${TELEGRAM_CHAT_ID_MGMT_HQ}"
+    description: "高管决策、战略方向讨论"
+    members:
+      - coordinator
+      - finance_lead
+      - ops_lead
+    permissions:
+      can_post: ["coordinator"]
+      can_mention: ["all"]
+
+  # 销售团队群
+  sales_team:
+    name: "销售团队"
+    chat_id: "${TELEGRAM_CHAT_ID_SALES_TEAM}"
+    description: "客户跟进、销售线索、订单确认"
+    members:
+      - sales_lead
+      - coordinator
+    permissions:
+      can_post: ["sales_lead"]
+      can_mention: ["all"]
+
+  # 供应链团队群
+  supply_team:
+    name: "供应链团队"
+    chat_id: "${TELEGRAM_CHAT_ID_SUPPLY_TEAM}"
+    description: "采购、供应商沟通、物流跟踪"
+    members:
+      - supply_lead
+      - ops_lead
+    permissions:
+      can_post: ["supply_lead", "ops_lead"]
+      can_mention: ["all"]
+
+  # 运营团队群
+  ops_team:
+    name: "运营团队"
+    chat_id: "${TELEGRAM_CHAT_ID_OPS_TEAM}"
+    description: "日常运营、物流、清关"
+    members:
+      - ops_lead
+      - coordinator
+    permissions:
+      can_post: ["ops_lead"]
+      can_mention: ["all"]
+
+  # 财务团队群
+  finance_team:
+    name: "财务团队"
+    chat_id: "${TELEGRAM_CHAT_ID_FINANCE_TEAM}"
+    description: "收付款、发票、对账"
+    members:
+      - finance_lead
+      - coordinator
+    permissions:
+      can_post: ["finance_lead"]
+      can_mention: ["all"]
+
+# Bot 配置
+bots:
+  coordinator:
+    token: "${TELEGRAM_BOT_TOKEN_COORDINATOR}"
+    commands:
+      - start
+      - status
+      - help
+  
+  hr:
+    token: "${TELEGRAM_BOT_TOKEN_HR}"
+    commands:
+      - start
+      - status
+  
+  sales_lead:
+    token: "${TELEGRAM_BOT_TOKEN_SALES_LEAD}"
+    commands:
+      - start
+      - new_order
+      - status
+  
+  supply_lead:
+    token: "${TELEGRAM_BOT_TOKEN_SUPPLY_LEAD}"
+    commands:
+      - start
+      - new_po
+      - track
+  
+  ops_lead:
+    token: "${TELEGRAM_BOT_TOKEN_OPS_LEAD}"
+    commands:
+      - start
+      - shipment
+      - track
+  
+  finance_lead:
+    token: "${TELEGRAM_BOT_TOKEN_FINANCE_LEAD}"
+    commands:
+      - start
+      - invoice
+      - payment

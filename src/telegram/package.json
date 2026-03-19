@@ -1,0 +1,9 @@
+{
+  "name": "telegram-tools",
+  "version": "0.1.0",
+  "description": "Telegram 消息发送工具",
+  "main": "index.js",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.64.0"
+  }
+}

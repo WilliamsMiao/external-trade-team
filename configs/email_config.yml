@@ -1,0 +1,75 @@
+# ===========================================
+# 邮件配置 - email_config.yml
+# 各职能 SMTP/IMAP 配置
+# ===========================================
+
+# 环境变量引用格式: ${VAR_NAME}
+# 例如: smtp_host: "${SMTP_HOST}"
+
+smtp:
+  host: "${SMTP_HOST}"
+  port: "${SMTP_PORT}"
+  user: "${SMTP_USER}"
+  password: "${SMTP_PASSWORD}"
+  from_address: "${SMTP_FROM}"
+
+imap:
+  host: "${IMAP_HOST}"
+  port: "${IMAP_PORT}"
+  user: "${IMAP_USER}"
+  password: "${IMAP_PASSWORD}"
+
+# 各职能邮箱配置
+accounts:
+  sales:
+    name: "Sales Team"
+    email: "sales@yourbusiness.com"
+    smtp_enabled: true
+    imap_enabled: true
+    # 收件规则
+    filters:
+      - type: "from"
+        pattern: "customer"
+      - type: "subject"
+        pattern: "order|inquiry|quote"
+
+  supply:
+    name: "Supply Team"
+    email: "supply@yourbusiness.com"
+    smtp_enabled: true
+    imap_enabled: true
+    filters:
+      - type: "from"
+        pattern: "supplier|vendor"
+      - type: "subject"
+        pattern: "shipment|delivery|po"
+
+  ops:
+    name: "Operations Team"
+    email: "ops@yourbusiness.com"
+    smtp_enabled: true
+    imap_enabled: true
+    filters:
+      - type: "subject"
+        pattern: "shipping|logistics|tracking"
+
+  finance:
+    name: "Finance Team"
+    email: "finance@yourbusiness.com"
+    smtp_enabled: true
+    imap_enabled: true
+    filters:
+      - type: "subject"
+        pattern: "invoice|payment|receipt|bank"
+
+  hr:
+    name: "HR Team"
+    email: "hr@yourbusiness.com"
+    smtp_enabled: true
+    imap_enabled: true
+
+# 审计邮箱
+audit:
+  email: "${AUDIT_EMAIL}"
+  enabled: true
+  forward_all: false

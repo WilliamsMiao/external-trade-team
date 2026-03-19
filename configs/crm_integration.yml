@@ -1,0 +1,64 @@
+# ===========================================
+# CRM 集成配置 - crm_integration.yml
+# Salesforce / HubSpot 配置
+# ===========================================
+
+salesforce:
+  enabled: false
+  instance_url: "${SALESFORCE_INSTANCE_URL}"
+  client_id: "${SALESFORCE_CLIENT_ID}"
+  client_secret: "${SALESFORCE_CLIENT_SECRET}"
+  username: "${SALESFORCE_USERNAME}"
+  password: "${SALESFORCE_PASSWORD}"
+  
+  # 字段映射
+  field_mappings:
+    customer:
+      name: "Name"
+      email: "Email"
+      phone: "Phone"
+      company: "AccountName"
+      country: "BillingCountry"
+    order:
+      order_id: "OrderNumber"
+      total: "TotalAmount"
+      status: "Status"
+      created_date: "EffectiveDate"
+
+hubspot:
+  enabled: false
+  api_key: "${HUBSPOT_API_KEY}"
+  
+  # 字段映射
+  field_mappings:
+    customer:
+      name: "firstname"
+      email: "email"
+      company: "company"
+    deal:
+      deal_name: "dealname"
+      amount: "amount"
+      stage: "dealstage"
+
+# 同步配置
+sync:
+  auto_sync: false
+  interval_minutes: 60
+  bidirectional: false  # true = 双向同步, false = 单向
+  
+  # 同步哪些对象
+  objects:
+    - customers
+    - orders
+    - contacts
+
+# Webhook 配置
+webhooks:
+  enabled: false
+  endpoints:
+    - name: "new_customer"
+      object: "customer"
+      event: "created"
+    - name: "order_status_change"
+      object: "order"
+      event: "updated"

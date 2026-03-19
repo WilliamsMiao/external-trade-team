@@ -1,0 +1,51 @@
+{
+  "name": "Supply Lead",
+  "type": "supply_lead",
+  "description": "供应链与采购管理，负责供应商开发和采购执行",
+  "status": "active",
+  "llm_config": {
+    "provider": "minimax",
+    "model": "${MINIMAX_MODEL_GENERAL}",
+    "temperature": 0.6,
+    "max_tokens": 2000
+  },
+  "tools": [
+    {
+      "name": "log_audit",
+      "path": "/app/src/audit/index.js#logAction",
+      "description": "记录业务操作到审计日志"
+    },
+    {
+      "name": "check_inventory",
+      "path": "/app/src/supply/check_inventory.js#checkInventory",
+      "description": "检查产品库存"
+    },
+    {
+      "name": "generate_po",
+      "path": "/app/src/supply/generate_po.js#generatePO",
+      "description": "生成采购订单"
+    },
+    {
+      "name": "send_po_to_supplier",
+      "path": "/app/src/supply/generate_po.js#sendPOToSupplier",
+      "description": "发送采购订单给供应商"
+    },
+    {
+      "name": "track_shipment",
+      "path": "/app/src/supply/generate_po.js#trackShipment",
+      "description": "跟踪物流信息"
+    },
+    {
+      "name": "send_to_group",
+      "path": "/app/src/telegram/index.js#sendToGroup",
+      "description": "发送消息到Telegram群"
+    }
+  ],
+  "notification_channels": [
+    "telegram:supply_lead"
+  ],
+  "databases": [
+    "suppliers",
+    "purchase_orders"
+  ]
+}

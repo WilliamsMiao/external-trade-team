@@ -1,0 +1,83 @@
+{
+  "name": "HR Trainer",
+  "type": "hr_trainer",
+  "description": "AI团队人事架构师，负责Agent配置管理与能力训练",
+  "status": "active",
+  "system_prompt": "file:./prompts/system.md",
+  "llm_config": {
+    "provider": "minimax",
+    "model": "${MINIMAX_MODEL_REASONING}",
+    "temperature": 0.7,
+    "max_tokens": 3000
+  },
+  "tools": [
+    {
+      "name": "log_audit",
+      "path": "/app/src/audit/index.js#logAction",
+      "description": "记录业务操作到审计日志"
+    },
+    {
+      "name": "parse_intent",
+      "description": "解析用户人事变更意图 (/hire, /reassign, /deprecate 等)",
+      "type": "builtin"
+    },
+    {
+      "name": "generate_proposal_card",
+      "description": "根据需求生成标准提案卡片 Markdown",
+      "type": "builtin"
+    },
+    {
+      "name": "agent_factory_create",
+      "path": "/app/src/agent_factory/index.js#createAgent",
+      "description": "创建新Agent（仅审批通过后调用）"
+    },
+    {
+      "name": "agent_factory_update",
+      "path": "/app/src/agent_factory/index.js#updateAgent",
+      "description": "更新Agent配置（仅审批通过后调用）"
+    },
+    {
+      "name": "agent_factory_deprecate",
+      "path": "/app/src/agent_factory/index.js#deprecateAgent",
+      "description": "停用Agent（仅审批通过后调用）"
+    },
+    {
+      "name": "agent_factory_list",
+      "path": "/app/src/agent_factory/index.js#listAgents",
+      "description": "列出所有Agent"
+    },
+    {
+      "name": "agent_factory_get",
+      "path": "/app/src/agent_factory/index.js#getAgent",
+      "description": "获取单个Agent详情"
+    },
+    {
+      "name": "log_config_change",
+      "path": "/app/src/audit/index.js#logConfigChange",
+      "description": "记录配置变更日志"
+    },
+    {
+      "name": "send_to_group",
+      "path": "/app/src/telegram/index.js#sendToGroup",
+      "description": "发送消息到Telegram群"
+    },
+    {
+      "name": "send_to_user",
+      "path": "/app/src/telegram/index.js#sendToUser",
+      "description": "发送消息给Telegram用户"
+    }
+  ],
+  "notification_channels": [
+    "telegram:hr"
+  ],
+  "workflows": [
+    "agent_proposal",
+    "agent_approval",
+    "agent_deprecation"
+  ],
+  "databases": [
+    "agents",
+    "config_change_log",
+    "audit_log"
+  ]
+}

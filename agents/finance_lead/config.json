@@ -1,0 +1,51 @@
+{
+  "name": "Finance Lead",
+  "type": "finance_lead",
+  "description": "财务与合规管理，负责收付款和风险管理",
+  "status": "active",
+  "llm_config": {
+    "provider": "minimax",
+    "model": "${MINIMAX_MODEL_GENERAL}",
+    "temperature": 0.5,
+    "max_tokens": 2000
+  },
+  "tools": [
+    {
+      "name": "log_audit",
+      "path": "/app/src/audit/index.js#logAction",
+      "description": "记录业务操作到审计日志"
+    },
+    {
+      "name": "generate_invoice",
+      "path": "/app/src/finance/generate_invoice.js#generateInvoice",
+      "description": "生成发票"
+    },
+    {
+      "name": "send_invoice",
+      "path": "/app/src/finance/generate_invoice.js#sendInvoice",
+      "description": "发送发票给客户"
+    },
+    {
+      "name": "payment_reminder",
+      "path": "/app/src/finance/generate_invoice.js#paymentReminder",
+      "description": "发送付款提醒"
+    },
+    {
+      "name": "cost_analysis",
+      "path": "/app/src/finance/generate_invoice.js#costAnalysis",
+      "description": "成本利润分析"
+    },
+    {
+      "name": "send_to_group",
+      "path": "/app/src/telegram/index.js#sendToGroup",
+      "description": "发送消息到Telegram群"
+    }
+  ],
+  "notification_channels": [
+    "telegram:finance_lead"
+  ],
+  "databases": [
+    "invoices",
+    "orders"
+  ]
+}

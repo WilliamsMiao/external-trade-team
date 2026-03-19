@@ -1,0 +1,262 @@
+version: '3.8'
+
+networks:
+  openclaw_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  pgadmin_data:
+  openclaw_tmp:
+  workspace_data:
+
+services:
+  # === 数据库 ===
+  postgres:
+    image: postgres:16-alpine
+    container_name: openclaw_postgres
+    environment:
+      POSTGRES_USER: openclaw
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: openclaw_trade
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - openclaw_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openclaw -d openclaw_trade"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # === 缓存 ===
+  redis:
+    image: redis:7-alpine
+    container_name: openclaw_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - openclaw_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # === OpenClaw Gateway ===
+  openclaw_gateway:
+    image: openclaw/runtime:latest-arm64
+    container_name: openclaw_gateway
+    environment:
+      DATABASE_URL: postgresql://openclaw:${DB_PASSWORD}@postgres:5432/openclaw_trade
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+      TIMEZONE: Asia/Hong_Kong
+      
+      # MiniMax LLM 配置
+      DEFAULT_LLM_PROVIDER: minimax
+      LLM_CONFIG: |
+        {
+          "minimax": {
+            "base_url": "${MINIMAX_API_BASE_URL}",
+            "api_key": "${MINIMAX_API_KEY}",
+            "models": {
+              "general": "${MINIMAX_MODEL_GENERAL}",
+              "highspeed": "${MINIMAX_MODEL_HIGHSPEED}",
+              "reasoning": "${MINIMAX_MODEL_REASONING}"
+            }
+          }
+        }
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY}
+      MINIMAX_API_BASE_URL: ${MINIMAX_API_BASE_URL}
+      MINIMAX_MODEL_GENERAL: ${MINIMAX_MODEL_GENERAL}
+      MINIMAX_MODEL_HIGHSPEED: ${MINIMAX_MODEL_HIGHSPEED}
+      MINIMAX_MODEL_REASONING: ${MINIMAX_MODEL_REASONING}
+    volumes:
+      - ./workspace:/root/.openclaw/workspace
+      - ./agents:/root/.openclaw/agents
+      - ./logs:/root/.openclaw/logs
+      - ./src:/app/src
+      - openclaw_tmp:/tmp
+    ports:
+      - "18789:18789"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - openclaw_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18789/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # === Agent Workers ===
+  # Coordinator Agent
+  agent_coordinator:
+    image: openclaw/agent-worker:latest-arm64
+    container_name: agent_coordinator
+    environment:
+      DATABASE_URL: postgresql://openclaw:${DB_PASSWORD}@postgres:5432/openclaw_trade
+      REDIS_URL: redis://redis:6379
+      LLM_PROVIDER: minimax
+      LLM_MODEL: ${MINIMAX_MODEL_GENERAL}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY}
+      MINIMAX_API_BASE_URL: ${MINIMAX_API_BASE_URL}
+      AGENT_NAME: coordinator
+      AGENT_TYPE: coordinator
+    volumes:
+      - ./agents/coordinator:/agent/config
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - openclaw_network
+
+  # HR Trainer Agent
+  agent_hr_trainer:
+    image: openclaw/agent-worker:latest-arm64
+    container_name: agent_hr_trainer
+    environment:
+      DATABASE_URL: postgresql://openclaw:${DB_PASSWORD}@postgres:5432/openclaw_trade
+      REDIS_URL: redis://redis:6379
+      LLM_PROVIDER: minimax
+      LLM_MODEL: ${MINIMAX_MODEL_REASONING}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY}
+      MINIMAX_API_BASE_URL: ${MINIMAX_API_BASE_URL}
+      AGENT_NAME: hr_trainer
+      AGENT_TYPE: hr_trainer
+    volumes:
+      - ./agents/hr_trainer:/agent/config
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - openclaw_network
+
+  # Sales Lead Agent
+  agent_sales_lead:
+    image: openclaw/agent-worker:latest-arm64
+    container_name: agent_sales_lead
+    environment:
+      DATABASE_URL: postgresql://openclaw:${DB_PASSWORD}@postgres:5432/openclaw_trade
+      REDIS_URL: redis://redis:6379
+      LLM_PROVIDER: minimax
+      LLM_MODEL: ${MINIMAX_MODEL_GENERAL}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY}
+      MINIMAX_API_BASE_URL: ${MINIMAX_API_BASE_URL}
+      AGENT_NAME: sales_lead
+      AGENT_TYPE: sales_lead
+    volumes:
+      - ./agents/sales_lead:/agent/config
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - openclaw_network
+
+  # Supply Lead Agent
+  agent_supply_lead:
+    image: openclaw/agent-worker:latest-arm64
+    container_name: agent_supply_lead
+    environment:
+      DATABASE_URL: postgresql://openclaw:${DB_PASSWORD}@postgres:5432/openclaw_trade
+      REDIS_URL: redis://redis:6379
+      LLM_PROVIDER: minimax
+      LLM_MODEL: ${MINIMAX_MODEL_GENERAL}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY}
+      MINIMAX_API_BASE_URL: ${MINIMAX_API_BASE_URL}
+      AGENT_NAME: supply_lead
+      AGENT_TYPE: supply_lead
+    volumes:
+      - ./agents/supply_lead:/agent/config
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - openclaw_network
+
+  # Ops Lead Agent
+  agent_ops_lead:
+    image: openclaw/agent-worker:latest-arm64
+    container_name: agent_ops_lead
+    environment:
+      DATABASE_URL: postgresql://openclaw:${DB_PASSWORD}@postgres:5432/openclaw_trade
+      REDIS_URL: redis://redis:6379
+      LLM_PROVIDER: minimax
+      LLM_MODEL: ${MINIMAX_MODEL_GENERAL}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY}
+      MINIMAX_API_BASE_URL: ${MINIMAX_API_BASE_URL}
+      AGENT_NAME: ops_lead
+      AGENT_TYPE: ops_lead
+    volumes:
+      - ./agents/ops_lead:/agent/config
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - openclaw_network
+
+  # Finance Lead Agent
+  agent_finance_lead:
+    image: openclaw/agent-worker:latest-arm64
+    container_name: agent_finance_lead
+    environment:
+      DATABASE_URL: postgresql://openclaw:${DB_PASSWORD}@postgres:5432/openclaw_trade
+      REDIS_URL: redis://redis:6379
+      LLM_PROVIDER: minimax
+      LLM_MODEL: ${MINIMAX_MODEL_GENERAL}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY}
+      MINIMAX_API_BASE_URL: ${MINIMAX_API_BASE_URL}
+      AGENT_NAME: finance_lead
+      AGENT_TYPE: finance_lead
+    volumes:
+      - ./agents/finance_lead:/agent/config
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - openclaw_network
+
+  # === PgAdmin (可选) ===
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: openclaw_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    networks:
+      - openclaw_network
+    restart: unless-stopped

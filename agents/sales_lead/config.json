@@ -1,0 +1,51 @@
+{
+  "name": "Sales Lead",
+  "type": "sales_lead",
+  "description": "销售与客户关系管理，负责客户开发、询盘处理和订单跟进",
+  "status": "active",
+  "llm_config": {
+    "provider": "minimax",
+    "model": "${MINIMAX_MODEL_GENERAL}",
+    "temperature": 0.7,
+    "max_tokens": 2000
+  },
+  "tools": [
+    {
+      "name": "log_audit",
+      "path": "/app/src/audit/index.js#logAction",
+      "description": "记录业务操作到审计日志"
+    },
+    {
+      "name": "parse_inquiry",
+      "path": "/app/src/sales/parse_inquiry.js#parseInquiry",
+      "description": "解析客户询盘，提取结构化信息"
+    },
+    {
+      "name": "generate_quote",
+      "path": "/app/src/sales/generate_quote.js#generateQuote",
+      "description": "根据询盘生成报价单"
+    },
+    {
+      "name": "send_quote_email",
+      "path": "/app/src/sales/generate_quote.js#sendQuoteEmail",
+      "description": "发送报价邮件给客户"
+    },
+    {
+      "name": "route_to_specialist",
+      "path": "/app/src/sales/generate_quote.js#routeToSpecialist",
+      "description": "根据语言/区域路由给专门Sales"
+    },
+    {
+      "name": "send_to_group",
+      "path": "/app/src/telegram/index.js#sendToGroup",
+      "description": "发送消息到Telegram群"
+    }
+  ],
+  "notification_channels": [
+    "telegram:sales_lead"
+  ],
+  "databases": [
+    "customers",
+    "orders"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "name": "Coordinator",
+  "type": "coordinator",
+  "description": "跨部门任务协调中枢，负责任务路由、进度追踪和汇报汇总",
+  "status": "active",
+  "llm_config": {
+    "provider": "minimax",
+    "model": "${MINIMAX_MODEL_GENERAL}",
+    "temperature": 0.7,
+    "max_tokens": 2000
+  },
+  "tools": [
+    {
+      "name": "log_audit",
+      "path": "/app/src/audit/index.js#logAction",
+      "description": "记录业务操作到审计日志"
+    },
+    {
+      "name": "route_task_to_lead",
+      "path": "/app/src/coordinator/route_task.js#routeTaskToLead",
+      "description": "根据任务描述路由到合适的Lead"
+    },
+    {
+      "name": "generate_daily_summary",
+      "path": "/app/src/coordinator/route_task.js#generateDailySummary",
+      "description": "生成每日业务汇总"
+    },
+    {
+      "name": "format_summary_markdown",
+      "path": "/app/src/coordinator/route_task.js#formatSummaryAsMarkdown",
+      "description": "将汇总格式化为Markdown"
+    },
+    {
+      "name": "risk_alert",
+      "path": "/app/src/coordinator/route_task.js#riskAlert",
+      "description": "生成风险告警"
+    },
+    {
+      "name": "send_to_group",
+      "path": "/app/src/telegram/index.js#sendToGroup",
+      "description": "发送消息到Telegram群"
+    }
+  ],
+  "notification_channels": [
+    "telegram:coordinator"
+  ],
+  "workflows": [
+    "order_fulfillment",
+    "customer_onboarding",
+    "supplier_approval",
+    "daily_status_report"
+  ],
+  "databases": [
+    "tasks",
+    "orders",
+    "audit_log"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "name": "Ops Lead",
+  "type": "ops_lead",
+  "description": "运营与物流管理，负责货物运输和清关处理",
+  "status": "active",
+  "llm_config": {
+    "provider": "minimax",
+    "model": "${MINIMAX_MODEL_GENERAL}",
+    "temperature": 0.6,
+    "max_tokens": 2000
+  },
+  "tools": [
+    {
+      "name": "log_audit",
+      "path": "/app/src/audit/index.js#logAction",
+      "description": "记录业务操作到审计日志"
+    },
+    {
+      "name": "schedule_production",
+      "path": "/app/src/ops/schedule_production.js#scheduleProduction",
+      "description": "安排生产计划"
+    },
+    {
+      "name": "qc_checklist",
+      "path": "/app/src/ops/schedule_production.js#generateQCChecklist",
+      "description": "生成质检清单"
+    },
+    {
+      "name": "issue_report",
+      "path": "/app/src/ops/schedule_production.js#issueReport",
+      "description": "上报问题"
+    },
+    {
+      "name": "send_to_group",
+      "path": "/app/src/telegram/index.js#sendToGroup",
+      "description": "发送消息到Telegram群"
+    }
+  ],
+  "notification_channels": [
+    "telegram:ops_lead"
+  ],
+  "databases": [
+    "orders",
+    "shipments"
+  ]
+}

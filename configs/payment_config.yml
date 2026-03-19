@@ -1,0 +1,67 @@
+# ===========================================
+# 支付配置 - payment_config.yml
+# Stripe / Wise 配置
+# ===========================================
+
+stripe:
+  enabled: false
+  api_key: "${STRIPE_API_KEY}"
+  webhook_secret: "${STRIPE_WEBHOOK_SECRET}"
+  
+  # 支付方式
+  payment_methods:
+    - card
+    - bank_transfer
+  
+  # 货币
+  currencies:
+    - USD
+    - EUR
+    - HKD
+  
+  # Webhook 事件
+  webhook_events:
+    - payment_intent.succeeded
+    - payment_intent.payment_failed
+    - charge.refunded
+    - invoice.payment_succeeded
+
+wise:
+  enabled: false
+  api_token: "${WISE_API_TOKEN}"
+  
+  # 收款账户
+  profiles:
+    business:
+      profile_id: "${WISE_BUSINESS_PROFILE_ID}"
+    operations:
+      profile_id: "${WISE_OPS_PROFILE_ID}"
+  
+  # 货币
+  currencies:
+    - USD
+    - CNY
+    - HKD
+    - EUR
+    - GBP
+
+# 账单配置
+invoicing:
+  auto_generate: false
+  prefix: "INV"
+  next_number: 1001
+  
+  payment_terms:
+    default: "net_30"
+    options:
+      - "net_15"
+      - "net_30"
+      - "net_60"
+      - "immediate"
+
+# 对账配置
+reconciliation:
+  enabled: false
+  check_interval_hours: 24
+  auto_match: true
+  tolerance: 0.01  # 金额容差

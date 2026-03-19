@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Agent Factory - Agent Spec Schema",
+  "description": "创建新Agent的输入参数schema",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Agent名称（英文，snake_case）",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "examples": ["new_sales_agent", "product_specialist"]
+    },
+    "type": {
+      "type": "string",
+      "description": "Agent类型",
+      "enum": [
+        "coordinator",
+        "hr_trainer", 
+        "sales_lead",
+        "supply_lead",
+        "ops_lead",
+        "finance_lead",
+        "custom"
+      ]
+    },
+    "department": {
+      "type": "string",
+      "description": "所属部门",
+      "enum": ["management", "sales", "supply", "operations", "finance", "hr", "custom"]
+    },
+    "description": {
+      "type": "string",
+      "description": "Agent描述"
+    },
+    "responsibilities": {
+      "type": "array",
+      "description": "职责列表",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "llm_model": {
+      "type": "string",
+      "description": "使用的LLM模型（默认使用环境变量配置）",
+      "default": "${MINIMAX_MODEL_GENERAL}"
+    },
+    "tools": {
+      "type": "array",
+      "description": "Agent可用的工具列表",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "telegram_bot_token": {
+      "type": "string",
+      "description": "Telegram Bot Token（可选）"
+    },
+    "groups": {
+      "type": "array",
+      "description": "Telegram群组",
+      "items": {
+        "type": "string",
+        "enum": ["mgmt_hq", "sales_team", "supply_team", "ops_team", "finance_team"]
+      }
+    }
+  },
+  "required": ["name", "type", "department", "responsibilities"]
+}
